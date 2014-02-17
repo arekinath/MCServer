@@ -28,6 +28,10 @@
 	#include <fstream>
 #elif defined(__APPLE__)
 	#include <mach/mach.h>
+#elif defined(__sun) || defined(__sun__)
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <procfs.h>
 #endif
 
 extern bool g_TERMINATE_EVENT_RAISED;
@@ -675,6 +679,17 @@ int cRoot::GetVirtualRAMUsage(void)
 			}
 		}
 		return -1;
+	#elif defined(__sun) || defined(__sun__)
+		struct psinfo psinfo;
+		int fd = -1;
+		if ((fd = open("/proc/self/psinfo", O_RDONLY)) < 0)
+			return -1;
+		if (read(fd, &psinfo, sizeof(psinfo)) != sizeof(psinfo)) {
+			close(fd);
+			return -1;
+		}
+		close(fd);
+		return (psinfo.pr_size);
 	#elif defined (__APPLE__)
 		// Code adapted from http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 		struct task_basic_info t_info;
@@ -742,6 +757,17 @@ int cRoot::GetPhysicalRAMUsage(void)
 		    return (int)(t_info.resident_size / 1024);
 		}
 		return -1;
+	#elif defined(__sun) || defined(__sun__)
+		struct psinfo psinfo;
+		int fd = -1;
+		if ((fd = open("/proc/self/psinfo", O_RDONLY)) < 0)
+			return -1;
+		if (read(fd, &psinfo, sizeof(psinfo)) != sizeof(psinfo)) {
+			close(fd);
+			return -1;
+		}
+		close(fd);
+		return (psinfo.pr_rssize);
 	#else
 		LOGINFO("%s: Unknown platform, cannot query memory usage", __FUNCTION__);
 		return -1;

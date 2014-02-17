@@ -8,6 +8,8 @@
 	#include <unistd.h>
 	#include <arpa/inet.h>  // inet_ntoa()
 	#include <sys/ioctl.h>  // ioctl()
+	#include <signal.h>
+	#include <fcntl.h>
 #else
 	#define socklen_t int
 #endif
@@ -19,6 +21,9 @@
 cSocket::cSocket(xSocket a_Socket)
 	: m_Socket(a_Socket)
 {
+#if !defined(MSG_NOSIGNAL)
+	signal(SIGPIPE, SIG_IGN);
+#endif
 }
 
 
@@ -332,7 +337,11 @@ int cSocket::Receive(char * a_Buffer, unsigned int a_Length, unsigned int a_Flag
 
 int cSocket::Send(const char * a_Buffer, unsigned int a_Length)
 {
+#if defined(MSG_NOSIGNAL)
 	return send(m_Socket, a_Buffer, a_Length, MSG_NOSIGNAL);
+#else
+	return send(m_Socket, a_Buffer, a_Length, 0);
+#endif
 }
 
 
@@ -358,9 +367,12 @@ unsigned short cSocket::GetPort(void) const
 
 void cSocket::SetNonBlocking(void)
 {
-	#ifdef _WIN32
+	#if defined(_WIN32)
 		u_long NonBlocking = 1;
 		int res = ioctlsocket(m_Socket, FIONBIO, &NonBlocking);
+	#elif defined(O_NONBLOCK)
+		int flags = fcntl(m_Socket, F_GETFL, 0);
+		int res = fcntl(m_Socket, F_SETFL, flags | O_NONBLOCK);
 	#else
 		int NonBlocking = 1;
 		int res = ioctl(m_Socket, FIONBIO, (char *)&NonBlocking);
